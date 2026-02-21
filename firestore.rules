@@ -1,0 +1,78 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return signedIn() && request.auth.uid == userId;
+    }
+
+    function isCoach() {
+      return signedIn() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'coach';
+    }
+
+    function isAthlete() {
+      return signedIn() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'athlete';
+    }
+
+    function ownsAthlete(athleteId) {
+      return isCoach() &&
+        get(/databases/$(database)/documents/users/$(athleteId)).data.coachId == request.auth.uid;
+    }
+
+    match /users/{userId} {
+      allow read, create, update, delete: if isOwner(userId);
+    }
+
+    match /programs/{programId} {
+      allow read: if isCoach() && resource.data.coachId == request.auth.uid;
+      allow create: if isCoach() && request.resource.data.coachId == request.auth.uid;
+      allow update, delete: if isCoach() && resource.data.coachId == request.auth.uid;
+    }
+
+    match /program_templates/{templateId} {
+      allow read: if isCoach() && resource.data.coachId == request.auth.uid;
+      allow create: if isCoach() && request.resource.data.coachId == request.auth.uid;
+      allow update, delete: if isCoach() && resource.data.coachId == request.auth.uid;
+    }
+
+    match /athletes/{athleteId} {
+      allow read, create, update, delete: if ownsAthlete(athleteId);
+    }
+
+    match /program_workouts/{workoutId} {
+      allow read: if isCoach() && resource.data.coachId == request.auth.uid;
+      allow create: if isCoach() && request.resource.data.coachId == request.auth.uid;
+      allow update, delete: if isCoach() && resource.data.coachId == request.auth.uid;
+    }
+
+    match /program_assignments/{assignmentId} {
+      allow read: if isCoach() && resource.data.coachId == request.auth.uid;
+      allow create: if isCoach() && request.resource.data.coachId == request.auth.uid;
+      allow update, delete: if isCoach() && resource.data.coachId == request.auth.uid;
+    }
+
+    match /scheduled_workouts/{scheduledWorkoutId} {
+      allow read: if isAthlete() && resource.data.athleteId == request.auth.uid;
+      allow create: if isCoach() && request.resource.data.coachId == request.auth.uid;
+      allow update: if isCoach() && resource.data.coachId == request.auth.uid;
+      allow delete: if false;
+    }
+
+    match /workout_logs/{logId} {
+      allow read: if isAthlete() && resource.data.athleteId == request.auth.uid;
+      allow create, update: if isAthlete() && request.resource.data.athleteId == request.auth.uid;
+      allow delete: if false;
+    }
+
+    match /set_logs/{setLogId} {
+      allow read: if isAthlete() && resource.data.athleteId == request.auth.uid;
+      allow create, update: if isAthlete() && request.resource.data.athleteId == request.auth.uid;
+      allow delete: if false;
+    }
+  }
+}
